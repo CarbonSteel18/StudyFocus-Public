@@ -61,7 +61,7 @@ keytool -genkeypair -v -keystore studyfocus-release.jks -keyalg RSA -keysize 204
 On macOS/Linux, encode it for the `ANDROID_KEYSTORE_BASE64` secret with:
 
 ```bash
-base64 -w 0 studyfocus-release.jks
+base64 studyfocus-release.jks | tr -d '\n'
 ```
 
 On Windows PowerShell:
