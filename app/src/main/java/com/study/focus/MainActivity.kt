@@ -17,6 +17,7 @@ import com.study.focus.data.database.StudyFocusDatabase
 import com.study.focus.data.database.TaskEntity
 import com.study.focus.data.migration.LegacyPreferencesImporter
 import com.study.focus.data.repository.StudyFocusRepository
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -194,6 +195,8 @@ class MainActivity : Activity() {
                     Toast.makeText(this@MainActivity,
                         "Some older entries were saved for recovery.", Toast.LENGTH_LONG).show()
                 }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (_: Exception) {
                 // Keep the SharedPreferences-backed app usable if Room setup or import fails.
                 roomReady = false
