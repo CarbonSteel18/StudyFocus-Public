@@ -56,6 +56,8 @@ See the [GitHub Releases page](https://github.com/CarbonSteel18/StudyFocus-Publi
 
 Found a bug, have an idea, or want to suggest an improvement? Please [open an issue on GitHub](https://github.com/CarbonSteel18/StudyFocus-Public/issues).
 
+For direct support or suggestions, you can also [contact the maintainer through their website](https://guns.lol/carbonsteel18).
+
 When reporting a problem, include:
 - Your Android version and device model.
 - The StudyFocus app version.
