@@ -12,6 +12,18 @@ import android.os.CountDownTimer
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
+import com.study.focus.data.database.FocusSessionEntity
+import com.study.focus.data.database.StudyFocusDatabase
+import com.study.focus.data.database.TaskEntity
+import com.study.focus.data.migration.LegacyPreferencesImporter
+import com.study.focus.data.repository.StudyFocusRepository
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.util.UUID
 import android.view.Gravity
 import android.view.View
 import android.widget.*
@@ -102,6 +114,11 @@ private class Store(a: Activity) {
 
 class MainActivity : Activity() {
     private lateinit var store: Store
+    private lateinit var repository: StudyFocusRepository
+    private val activityScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+    private var roomReady = false
+    private var taskCache = mutableListOf<Task>()
+    private var sessionCache = mutableListOf<Session>()
     private lateinit var page: LinearLayout
     private var tab = "Home"
     private var due = 0L
@@ -130,9 +147,12 @@ class MainActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        store = Store(this); window.statusBarColor = BG; window.navigationBarColor = BG
+        store = Store(this)
+        taskCache = store.tasks()
+        sessionCache = store.sessions()
+        window.statusBarColor = BG; window.navigationBarColor = BG
         flipHandler.post(flipTicker)
-        show()
+        initializeRoom()
     }
     override fun onBackPressed() {
         if (tab == "Flip") {
@@ -143,7 +163,77 @@ class MainActivity : Activity() {
         }
     }
 
-    override fun onDestroy() { timer?.cancel(); flipHandler.removeCallbacks(flipTicker); applyFlipImmersiveMode(false); super.onDestroy() }
+    override fun onDestroy() {
+        timer?.cancel()
+        activityScope.cancel()
+        flipHandler.removeCallbacks(flipTicker)
+        applyFlipImmersiveMode(false)
+        super.onDestroy()
+    }
+
+    private fun initializeRoom() {
+        val database = StudyFocusDatabase.getInstance(applicationContext)
+        repository = StudyFocusRepository(database.studyFocusDao())
+        activityScope.launch {
+            try {
+                val imported = withContext(Dispatchers.IO) {
+                    LegacyPreferencesImporter.migrate(applicationContext, database.studyFocusDao())
+                }
+                val persisted = withContext(Dispatchers.IO) {
+                    repository.tasks() to repository.sessions()
+                }
+                taskCache = persisted.first.map {
+                    Task(it.id, it.title, it.subject, it.priority, it.dueAtMillis, it.isDone)
+                }.toMutableList()
+                sessionCache = persisted.second.map {
+                    Session(it.subject, it.durationSeconds, it.endedAtMillis, it.isAssignment)
+                }.toMutableList()
+                roomReady = true
+                show()
+                if (imported.recoveredPayloads.isNotEmpty()) {
+                    Toast.makeText(this@MainActivity,
+                        "Some older entries were saved for recovery.", Toast.LENGTH_LONG).show()
+                }
+            } catch (_: Exception) {
+                // Keep the SharedPreferences-backed app usable if Room setup or import fails.
+                roomReady = false
+                taskCache = store.tasks()
+                sessionCache = store.sessions()
+                show()
+                Toast.makeText(this@MainActivity,
+                    "Local database setup failed. Existing saved data is still available.",
+                    Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
+    private fun taskList(): MutableList<Task> = taskCache.toMutableList()
+    private fun sessionList(): MutableList<Session> = sessionCache.toMutableList()
+
+    private fun saveTasks(tasks: List<Task>) {
+        taskCache = tasks.toMutableList()
+        store.saveTasks(tasks)
+        if (roomReady) activityScope.launch {
+            repository.saveTasks(tasks.map {
+                TaskEntity(it.id, it.title, it.subject, it.priority, it.due, it.done)
+            })
+        }
+    }
+
+    private fun addSession(session: Session) {
+        sessionCache.add(session)
+        while (sessionCache.size > 500) sessionCache.removeAt(0)
+        store.addSession(session)
+        if (roomReady) activityScope.launch {
+            repository.addSession(FocusSessionEntity(
+                id = UUID.randomUUID().toString(),
+                subject = session.subject,
+                durationSeconds = session.seconds,
+                endedAtMillis = session.ended,
+                isAssignment = session.assignment
+            ))
+        }
+    }
 
     @Suppress("DEPRECATION")
     private fun applyFlipImmersiveMode(enabled: Boolean) {
