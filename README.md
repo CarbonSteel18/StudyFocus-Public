@@ -1,85 +1,89 @@
 # StudyFocus
 
-A minimal, dark-themed Android study companion for building consistent study habits.
+**Make every study session count.**
 
-StudyFocus brings your study tasks and focused sessions together in one place. The public edition is designed to work locally on your Android device and does not include the private Notion integration or its sync backend.
+StudyFocus is a simple, dark-themed Android study companion that brings your tasks, deadlines and focused study sessions together in one place. Plan what needs doing, focus on the work, and keep track of the time you put in.
 
-## Features
+> **Public edition:** This is the standalone public version of StudyFocus. It works locally on your Android device and does not include the private Notion integration or sync backend.
 
-- **Focus timer** — timed study sessions with 15, 25, 45 and 60-minute presets, pause and reset controls.
-- **Subject-wise tracking** — organise tasks and focus sessions by subject.
-- **Tasks and deadlines** — add tasks, set priorities and optional due dates, and mark work complete.
-- **Study statistics** — review completed focus time and session history.
-- **Flip clock** — a fullscreen clock view.
-- **Dark interface** — a distraction-light, dark UI.
+## Download StudyFocus
 
-## Project
+<p align="center">
+  <a href="https://github.com/CarbonSteel18/StudyFocus-Public/releases/download/v1.0.1/StudyFocus-v1.0.1.apk">
+    <strong>⬇️ Download StudyFocus v1.0.1 (Android APK)</strong>
+  </a>
+  <br />
+  <sub>Or <a href="https://github.com/CarbonSteel18/StudyFocus-Public/releases/latest">view all releases</a>.</sub>
+</p>
 
-This repository contains the native Android application.
+Download the APK only from this repository's official GitHub Releases page.
 
-- Language: Kotlin
-- UI: Android Views
-- Build system: Gradle
-- Minimum Android version: Android 8.0 (API 26)
+## Features and benefits
 
-## Download
+| Feature | How it helps |
+| --- | --- |
+| **Focus timer** | Choose a 15, 25, 45 or 60-minute session, then pause or reset when needed. |
+| **Subject-wise tracking** | Keep study tasks and focus sessions organised by subject. |
+| **Tasks and deadlines** | Add tasks, set priorities and optional due dates, then mark work complete. |
+| **Study statistics** | Review completed focus time and your session history to see your effort over time. |
+| **Fullscreen flip clock** | Keep a clear clock view visible while you study. |
+| **Dark interface** | A dark, distraction-light interface keeps the experience simple and comfortable. |
+| **Local data storage** | Your tasks and focus-session history stay on your device; no Notion account or sync setup is needed. |
 
-Once a signed release has been published, download the APK from the **Assets** section on the [GitHub Releases page](https://github.com/CarbonSteel18/StudyFocus-Public/releases).
+## Screenshots
 
-## Build locally
+_App screenshots will be added here._
 
-1. Install Android Studio and a Java 17 JDK.
-2. Open this repository in Android Studio.
-3. Allow Gradle to sync.
-4. Run the `app` configuration on an Android device or emulator.
+<!-- Add screenshots here when available. -->
 
-To build a debug APK from a terminal with Gradle installed:
+## Installation instructions
 
-```bash
-gradle assembleDebug
-```
+StudyFocus is distributed as an Android APK.
 
-The APK is generated at `app/build/outputs/apk/debug/app-debug.apk`.
+1. Open the [latest StudyFocus release](https://github.com/CarbonSteel18/StudyFocus-Public/releases/latest).
+2. In the **Assets** section, download the file named `StudyFocus-vX.Y.Z.apk`.
+3. Open the downloaded APK from your notification or Downloads folder.
+4. If Android asks, allow your browser or file manager to install apps from this source. Only enable this for the source you trust, and turn it off again afterwards if you prefer.
+5. Review the installation prompt and tap **Install**.
+6. Once installation finishes, tap **Open**.
 
-## Publishing a signed release
+**Requirements:** Android 8.0 (API 26) or later.
 
-The release workflow runs when a `v*` tag is pushed or when manually dispatched from GitHub Actions. It builds a signed release APK, verifies its signature, and attaches it to a GitHub Release.
+If Android displays a Play Protect scan, review its result before proceeding. Only install releases from this official repository.
 
-Before the first release, configure these four repository Actions secrets under **Settings → Secrets and variables → Actions**:
+## Version history
 
-- `ANDROID_KEYSTORE_BASE64` — the Base64-encoded contents of your Android signing keystore.
-- `ANDROID_KEYSTORE_PASSWORD` — the keystore password.
-- `ANDROID_KEY_ALIAS` — the key alias.
-- `ANDROID_KEY_PASSWORD` — the key password.
+| Version | Highlights |
+| --- | --- |
+| **v1.0.1** | Current public release. Uses its own app identity so it can be installed alongside StudyFocus Admin; includes the refreshed StudyFocus launcher icon. |
+| **v1.0.0** | First public release of the standalone StudyFocus app. |
 
-Create and keep the keystore somewhere safe outside this repository. Example command:
+See the [GitHub Releases page](https://github.com/CarbonSteel18/StudyFocus-Public/releases) for APK downloads and release details.
 
-```bash
-keytool -genkeypair -v -keystore studyfocus-release.jks -keyalg RSA -keysize 2048 -validity 10000 -alias studyfocus
-```
+## Feedback, bugs and suggestions
 
-On macOS/Linux, encode it for the `ANDROID_KEYSTORE_BASE64` secret with:
+Found a bug, have an idea, or want to suggest an improvement? Please [open an issue on GitHub](https://github.com/CarbonSteel18/StudyFocus-Public/issues).
 
-```bash
-base64 studyfocus-release.jks | tr -d '\n'
-```
+When reporting a problem, include:
+- Your Android version and device model.
+- The StudyFocus app version.
+- What you were trying to do.
+- What happened and what you expected to happen.
 
-On Windows PowerShell:
+Please do not include passwords, private information or sensitive personal data in a report.
 
-```powershell
-[Convert]::ToBase64String([IO.File]::ReadAllBytes("studyfocus-release.jks"))
-```
+## Privacy at a glance
 
-**Important:** Keep the keystore and its passwords private, store a secure backup, and never commit them or paste them into chat. Losing the keystore can prevent future updates from being signed as the same app.
+The public edition stores tasks and focus-session history locally using Android app preferences. It does not connect to Notion and does not require Notion credentials, a sync server or an external database.
 
-## Data and privacy
+## About this project
 
-Tasks and focus-session history are stored locally using Android app preferences. This public edition does not connect to Notion and does not require Notion credentials, a sync server, or external database configuration.
-
-## Public edition
-
-This is the standalone public edition of StudyFocus. The private development repository may contain additional integrations that are intentionally not included here.
+- **Platform:** Android
+- **Language:** Kotlin
+- **Interface:** Android Views
+- **Build system:** Gradle
+- **Minimum Android version:** Android 8.0 (API 26)
 
 ---
 
-Made with a focus on getting the work done.
+**StudyFocus — a little more focus, one session at a time.**
