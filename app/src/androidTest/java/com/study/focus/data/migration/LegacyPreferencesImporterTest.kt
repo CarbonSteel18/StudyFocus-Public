@@ -5,6 +5,8 @@ import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.study.focus.data.database.StudyFocusDatabase
+import com.study.focus.data.database.TaskEntity
+import com.study.focus.data.repository.StudyFocusRepository
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -87,6 +89,22 @@ class LegacyPreferencesImporterTest {
         assertEquals(1, report.recoveredPayloads.size)
         assertTrue(context.getSharedPreferences("study_focus_room_migration", Context.MODE_PRIVATE)
             .getBoolean("completed_v1", false))
+    }
+
+    @Test
+    fun repositoryReplacementRemovesDeletedTasks() = runBlocking {
+        val repository = StudyFocusRepository(database.studyFocusDao())
+        repository.saveTasks(listOf(
+            TaskEntity(1, "Keep", "Physics", 1, 0L, false),
+            TaskEntity(2, "Remove", "Chemistry", 2, 0L, false)
+        ))
+
+        repository.saveTasks(listOf(TaskEntity(1, "Keep", "Physics", 1, 0L, true)))
+
+        val remaining = repository.tasks()
+        assertEquals(1, remaining.size)
+        assertEquals(1L, remaining.single().id)
+        assertTrue(remaining.single().isDone)
     }
 
     @Test
