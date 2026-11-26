@@ -22,7 +22,11 @@ This repository contains the native Android application.
 - Build system: Gradle
 - Minimum Android version: Android 8.0 (API 26)
 
-## Build
+## Download
+
+Once a signed release has been published, download the APK from the **Assets** section on the [GitHub Releases page](https://github.com/CarbonSteel18/StudyFocus-Public/releases).
+
+## Build locally
 
 1. Install Android Studio and a Java 17 JDK.
 2. Open this repository in Android Studio.
@@ -36,6 +40,37 @@ gradle assembleDebug
 ```
 
 The APK is generated at `app/build/outputs/apk/debug/app-debug.apk`.
+
+## Publishing a signed release
+
+The release workflow runs when a `v*` tag is pushed or when manually dispatched from GitHub Actions. It builds a signed release APK, verifies its signature, and attaches it to a GitHub Release.
+
+Before the first release, configure these four repository Actions secrets under **Settings → Secrets and variables → Actions**:
+
+- `ANDROID_KEYSTORE_BASE64` — the Base64-encoded contents of your Android signing keystore.
+- `ANDROID_KEYSTORE_PASSWORD` — the keystore password.
+- `ANDROID_KEY_ALIAS` — the key alias.
+- `ANDROID_KEY_PASSWORD` — the key password.
+
+Create and keep the keystore somewhere safe outside this repository. Example command:
+
+```bash
+keytool -genkeypair -v -keystore studyfocus-release.jks -keyalg RSA -keysize 2048 -validity 10000 -alias studyfocus
+```
+
+On macOS/Linux, encode it for the `ANDROID_KEYSTORE_BASE64` secret with:
+
+```bash
+base64 -w 0 studyfocus-release.jks
+```
+
+On Windows PowerShell:
+
+```powershell
+[Convert]::ToBase64String([IO.File]::ReadAllBytes("studyfocus-release.jks"))
+```
+
+**Important:** Keep the keystore and its passwords private, store a secure backup, and never commit them or paste them into chat. Losing the keystore can prevent future updates from being signed as the same app.
 
 ## Data and privacy
 
