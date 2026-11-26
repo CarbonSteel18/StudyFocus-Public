@@ -13,6 +13,15 @@ interface StudyFocusDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun putTasks(tasks: List<TaskEntity>)
 
+    @Query("DELETE FROM tasks")
+    suspend fun clearTasks()
+
+    @androidx.room.Transaction
+    suspend fun replaceTasks(tasks: List<TaskEntity>) {
+        clearTasks()
+        putTasks(tasks)
+    }
+
     @Query("DELETE FROM tasks WHERE id = :id")
     suspend fun deleteTask(id: Long)
 
@@ -24,6 +33,9 @@ interface StudyFocusDao {
 
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertSessions(sessions: List<FocusSessionEntity>)
+
+    @Query("DELETE FROM focus_sessions WHERE id NOT IN (SELECT id FROM focus_sessions ORDER BY endedAtMillis DESC LIMIT 500)")
+    suspend fun pruneSessions()
 
     @Query("SELECT COUNT(*) FROM tasks")
     suspend fun taskCount(): Int
