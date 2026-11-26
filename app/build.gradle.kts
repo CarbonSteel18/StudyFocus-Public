@@ -1,6 +1,7 @@
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
+    id("org.jetbrains.kotlin.kapt")
 }
 
 val releaseKeystorePath = System.getenv("ANDROID_KEYSTORE_PATH")
@@ -9,8 +10,6 @@ val releaseKeyAlias = System.getenv("ANDROID_KEY_ALIAS")
 val releaseKeyPassword = System.getenv("ANDROID_KEY_PASSWORD")
 
 android {
-    // Keep the code namespace unchanged; use a distinct application ID so
-    // StudyFocus and StudyFocus Admin can be installed side by side.
     namespace = "com.study.focus"
     compileSdk = 34
 
@@ -55,4 +54,14 @@ android {
     kotlinOptions {
         jvmTarget = "17"
     }
+}
+
+dependencies {
+    implementation("androidx.room:room-runtime:2.6.1")
+    implementation("androidx.room:room-ktx:2.6.1")
+    kapt("androidx.room:room-compiler:2.6.1")
+}
+
+kapt {
+    correctErrorTypes = true
 }
