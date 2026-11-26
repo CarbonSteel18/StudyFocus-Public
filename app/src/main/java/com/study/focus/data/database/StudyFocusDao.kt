@@ -13,6 +13,12 @@ interface StudyFocusDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun putTasks(tasks: List<TaskEntity>)
 
+    @Query("DELETE FROM tasks WHERE id = :id")
+    suspend fun deleteTask(id: Long)
+
+    @Query("UPDATE tasks SET isDone = :done WHERE id = :id")
+    suspend fun setTaskDone(id: Long, done: Boolean)
+
     @Query("SELECT * FROM focus_sessions ORDER BY endedAtMillis DESC")
     suspend fun getSessions(): List<FocusSessionEntity>
 
