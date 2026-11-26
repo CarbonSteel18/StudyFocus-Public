@@ -197,8 +197,8 @@ class MainActivity : Activity() {
             } catch (_: Exception) {
                 // Keep the SharedPreferences-backed app usable if Room setup or import fails.
                 roomReady = false
-                taskCache = store.tasks()
-                sessionCache = store.sessions()
+                taskCache = taskList()
+                sessionCache = sessionList()
                 show()
                 Toast.makeText(this@MainActivity,
                     "Local database setup failed. Existing saved data is still available.",
@@ -328,14 +328,14 @@ class MainActivity : Activity() {
         p.addView(b, LinearLayout.LayoutParams(0, -2, 1f))
     }
     private fun home() {
-        val all = store.tasks()
+        val all = taskList()
         val welcome = card(page)
         welcome.addView(txt("Make today count.", 23f, FG, true)); gap(welcome, 5)
         welcome.addView(txt("Small focused sessions add up to big progress.", 13f, MUTED)); gap(welcome, 15)
         val m = row()
         metric(m, all.count { !it.done }.toString(), "To do", ACCENT)
         metric(m, all.count { it.done }.toString(), "Completed", GREEN)
-        metric(m, (store.sessions().filter { today(it.ended) }.sumOf { it.seconds } / 60).toString() + "m", "Focused today", 0xFFFFC979.toInt())
+        metric(m, (sessionList().filter { today(it.ended) }.sumOf { it.seconds } / 60).toString() + "m", "Focused today", 0xFFFFC979.toInt())
         welcome.addView(m)
         val f = card(page)
         f.addView(txt("FOCUS SESSION", 10f, ACCENT, true)); gap(f, 7)
@@ -376,13 +376,13 @@ class MainActivity : Activity() {
         form.addView(btn("Add task", true) {
             val s = name.text.toString().trim()
             if (s.isEmpty()) name.error = "Enter a task name" else {
-                val list = store.tasks()
+                val list = taskList()
                 list.add(Task((list.maxOfOrNull { it.id } ?: 0L) + 1L, s, subj.selectedItem.toString(), priority.selectedItemPosition + 1, due, false))
-                store.saveTasks(list); due = 0L; show()
+                saveTasks(list); due = 0L; show()
                 Toast.makeText(this, "Task added", Toast.LENGTH_SHORT).show()
             }
         })
-        val all = store.tasks()
+        val all = taskList()
         val open = all.filter { !it.done }.sortedBy { if (it.due == 0L) Long.MAX_VALUE else it.due }
         val done = all.filter { it.done }
         page.addView(txt("PENDING · " + open.size, 10f, MUTED, true)); gap(page, 7)
@@ -391,14 +391,14 @@ class MainActivity : Activity() {
         page.addView(txt("COMPLETED · " + done.size, 10f, MUTED, true)); gap(page, 7)
         done.forEach { taskRow(it) }
         if (done.isNotEmpty()) page.addView(btn("Clear completed", false) {
-            store.saveTasks(store.tasks().filterNot { it.done }); show()
+            saveTasks(taskList().filterNot { it.done }); show()
         })
     }
     private fun taskRow(t: Task) {
         val box = card(page); val line = row()
         line.addView(txt(if (t.done) "✓" else "○", 21f, if (t.done) GREEN else ACCENT, true).apply {
             setPadding(0, 0, dp(10), 0)
-            setOnClickListener { store.saveTasks(store.tasks().map { if (it.id == t.id) it.copy(done = !it.done) else it }); show() }
+            setOnClickListener { saveTasks(taskList().map { if (it.id == t.id) it.copy(done = !it.done) else it }); show() }
         })
         val details = col()
         val title = txt(t.title, 14f, if (t.done) MUTED else FG, true)
@@ -408,7 +408,7 @@ class MainActivity : Activity() {
         val dueText = if (t.due > 0) " · Due " + df.format(Date(t.due)) else ""
         details.addView(txt(t.subject + " · " + p + " priority" + dueText, 10f, MUTED))
         line.addView(details, LinearLayout.LayoutParams(0, -2, 1f))
-        line.addView(txt("×", 21f, MUTED).apply { setOnClickListener { store.saveTasks(store.tasks().filterNot { it.id == t.id }); show() } })
+        line.addView(txt("×", 21f, MUTED).apply { setOnClickListener { saveTasks(taskList().filterNot { it.id == t.id }); show() } })
         box.addView(line)
     }
     private fun focus() {
@@ -445,7 +445,7 @@ class MainActivity : Activity() {
         timer = object : CountDownTimer(left, 1000L) {
             override fun onTick(ms: Long) { left = ms; if (tab == "Focus") show() }
             override fun onFinish() {
-                left = 0L; running = false; store.addSession(Session(subject, duration * 60, System.currentTimeMillis(), false))
+                left = 0L; running = false; addSession(Session(subject, duration * 60, System.currentTimeMillis(), false))
                 Toast.makeText(this@MainActivity, "Focus session complete!", Toast.LENGTH_LONG).show(); show()
             }
         }.start()
@@ -610,7 +610,7 @@ class MainActivity : Activity() {
     }
 
     private fun stats() {
-        val ts = store.tasks(); val ss = store.sessions()
+        val ts = taskList(); val ss = sessionList()
         val todaySessions = ss.filter { today(it.ended) }
         val startWeek = Calendar.getInstance().apply {
             set(Calendar.DAY_OF_WEEK, firstDayOfWeek); set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
