@@ -7,22 +7,35 @@
 - Existing tasks and focus sessions are JSON in SharedPreferences.
 - Existing application identity and release signing configuration must remain unchanged.
 
-## Foundation added
+## Foundation and integration
 
 - Room 2.6.1 database with task and focus-session entities.
-- DAO methods use suspend functions; database access must not run synchronously on the UI thread.
-- A repeat-safe legacy importer reads the current study_focus_v2 preferences and the older study_focus_tasks task store.
-- Existing task IDs and represented task/session fields are retained.
-- Session IDs are deterministic so a retry after an interrupted import cannot duplicate imported legacy sessions.
-- Original preference values are never deleted. Unparseable JSON is copied into a dedicated recovery preference store and reported by the importer.
+- DAO methods use suspend functions; database access does not run synchronously on the UI thread.
+- A repository provides the persistence boundary used by the existing screens.
+- Startup imports the current `study_focus_v2` preferences and falls back to the older `study_focus_tasks` task store when needed.
+- Valid legacy entries are imported even when another entry in the same JSON array is damaged.
+- Existing task IDs and represented task/session fields are retained. Imported session IDs are deterministic, making interrupted imports safe to retry.
+- Malformed payloads and individual damaged entries are copied into a dedicated recovery preference store.
+- Room becomes the primary read source after migration succeeds. Task and session writes are also mirrored to the original preferences as a temporary rollback safeguard.
+- If Room setup or migration fails, the app remains usable with the original SharedPreferences store.
 - The database is created lazily and does not enable main-thread queries.
+- Task replacement removes deleted rows from Room, and focus-session history is capped at 500 records to match the previous store.
 
-## Migration rollout rule
+## Verification
 
-The importer is intentionally not called from MainActivity yet. The integration step must open Room off the main thread, run the importer before switching reads/writes to Room, verify counts and representative records, and keep old preferences intact for at least one stable release. Do not remove the legacy store until a rollback plan is reviewed.
+Instrumented tests cover:
+- Importing valid tasks and focus sessions.
+- Re-running migration without duplicating records.
+- Importing valid rows while retaining damaged rows for recovery.
+- Preserving malformed top-level JSON for recovery without crashing.
+- Falling back to the older task preference store.
+- Ensuring repository task replacement removes tasks deleted by the UI.
 
-## Next steps
+GitHub Actions compiles the debug app and runs the migration tests on an Android 14 emulator.
 
-1. Add repository methods and connect existing screens to Room through lifecycle-aware coroutines.
-2. Add migration tests for empty, valid, partially damaged, and malformed legacy payloads.
-3. Add a recovery/export path before retiring the old preference store.
+## Rollout safeguards
+
+- The original SharedPreferences values are not deleted.
+- The private StudyFocus Admin repository and its signing configuration are not changed.
+- This work remains on the `phase-0-foundation` branch and draft PR until build, test, and device regression checks pass.
+- Do not remove the legacy store until a backup/export path and rollback plan are reviewed.
