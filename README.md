@@ -4,8 +4,6 @@
 
 StudyFocus is a simple, dark-themed Android study companion that brings your tasks, deadlines and focused study sessions together in one place. Plan what needs doing, focus on the work, and keep track of the time you put in.
 
-> **Public edition:** This is the standalone public version of StudyFocus. It works locally on your Android device and does not include the private Notion integration or sync backend.
-
 ## Download StudyFocus
 
 <p align="center">
@@ -28,13 +26,7 @@ Download the APK only from this repository's official GitHub Releases page.
 | **Study statistics** | Review completed focus time and your session history to see your effort over time. |
 | **Fullscreen flip clock** | Keep a clear clock view visible while you study. |
 | **Dark interface** | A dark, distraction-light interface keeps the experience simple and comfortable. |
-| **Local data storage** | Your tasks and focus-session history stay on your device; no Notion account or sync setup is needed. |
-
-## Screenshots
-
-_App screenshots will be added here._
-
-<!-- Add screenshots here when available. -->
+| **Local data storage** | Your tasks and focus-session history are stored locally on your device. |
 
 ## Installation instructions
 
@@ -74,7 +66,7 @@ Please do not include passwords, private information or sensitive personal data 
 
 ## Privacy at a glance
 
-The public edition stores tasks and focus-session history locally using Android app preferences. It does not connect to Notion and does not require Notion credentials, a sync server or an external database.
+The public edition stores tasks and focus-session history locally using Android app preferences.
 
 ## About this project
 
