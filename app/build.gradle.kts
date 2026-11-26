@@ -9,15 +9,17 @@ val releaseKeyAlias = System.getenv("ANDROID_KEY_ALIAS")
 val releaseKeyPassword = System.getenv("ANDROID_KEY_PASSWORD")
 
 android {
+    // Keep the code namespace unchanged; use a distinct application ID so
+    // StudyFocus and StudyFocus Admin can be installed side by side.
     namespace = "com.study.focus"
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "com.study.focus"
+        applicationId = "com.studyfocus.public"
         minSdk = 26
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2
+        versionName = "1.0.1"
     }
 
     signingConfigs {
