@@ -16,7 +16,7 @@ class StudyFocusRepository(private val dao: StudyFocusDao) {
     }
 
     suspend fun saveTasks(tasks: List<TaskEntity>) {
-        dao.putTasks(tasks)
+        dao.replaceTasks(tasks)
     }
 
     suspend fun deleteTask(id: Long) {
@@ -31,6 +31,7 @@ class StudyFocusRepository(private val dao: StudyFocusDao) {
 
     suspend fun addSession(session: FocusSessionEntity) {
         dao.insertSessions(listOf(session))
+        dao.pruneSessions()
     }
 
     suspend fun counts(): Pair<Int, Int> = dao.taskCount() to dao.sessionCount()
