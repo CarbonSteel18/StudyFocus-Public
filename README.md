@@ -47,7 +47,7 @@ If Android displays a Play Protect scan, review its result before proceeding. On
 
 | Version | Highlights |
 | --- | --- |
-| **v1.0.1** | Current public release. Uses its own app identity so it can be installed alongside StudyFocus Admin; includes the refreshed StudyFocus launcher icon. |
+| **v1.0.1** | Latest public version of StudyFocus, featuring its focus timer, task management and study-tracking tools. |
 | **v1.0.0** | First public release of the standalone StudyFocus app. |
 
 See the [GitHub Releases page](https://github.com/CarbonSteel18/StudyFocus-Public/releases) for APK downloads and release details.
