@@ -42,12 +42,9 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-  migration-tests:
-    name: Run Room migration tests
-    # Force the Android emulator to use software TCG when KVM hardware acceleration is unavailable.
-    runs-on: ubuntu-24.04
-    env:
-      ANDROID_I_WANT_MY_TCG: "yes"
+  database-tests:
+    name: Run Room and backup tests (JVM)
+    runs-on: ubuntu-latest
     steps:
       - name: Check out source
         uses: actions/checkout@v4
@@ -63,13 +60,5 @@ jobs:
         with:
           gradle-version: "8.7"
 
-      - name: Run instrumentation tests on Android 14
-        uses: reactivecircus/android-emulator-runner@v2
-        with:
-          api-level: 34
-          target: google_apis
-          arch: x86_64
-          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
-          emulator-boot-timeout: 600
-          disable-animations: true
-          script: gradle --no-daemon connectedDebugAndroidTest
+      - name: Run unit and Robolectric tests
+        run: gradle --no-daemon testDebugUnitTest
