@@ -281,11 +281,18 @@ class MainActivity : Activity() {
                 sessionCache = persisted.second.map {
                     Session(it.subject, it.durationSeconds, it.endedAtMillis, it.isAssignment)
                 }.toMutableList()
-                // If migration had already completed, sessions recorded before Room became
-                // ready exist only in the legacy cache. Persist them instead of losing them
-                // when the database snapshot replaces the in-memory cache.
-                if (imported.alreadyCompleted && pendingSessions.isNotEmpty()) {
-                    val queued = pendingSessions.toList()
+                // Timer completion can happen while migration or the initial Room read is
+                // suspended. Reconcile queued sessions against the database snapshot so none
+                // are lost and sessions already imported from SharedPreferences aren't doubled.
+                if (pendingSessions.isNotEmpty()) {
+                    val queued = pendingSessions.filterNot { pending ->
+                        sessionCache.any { existing ->
+                            existing.subject == pending.subject &&
+                                existing.seconds == pending.seconds &&
+                                existing.ended == pending.ended &&
+                                existing.assignment == pending.assignment
+                        }
+                    }
                     withContext(Dispatchers.IO) {
                         queued.forEach { session ->
                             repository.addSession(FocusSessionEntity(
