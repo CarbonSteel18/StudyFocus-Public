@@ -62,14 +62,37 @@ jobs:
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: gradle --no-daemon assembleRelease
 
-      - name: Verify signed APK
+      - name: Verify package identity and signing continuity
         run: |
           set -euo pipefail
           APK="app/build/outputs/apk/release/app-release.apk"
           test -s "$APK"
           APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n 1)"
+          AAPT="$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort -V | tail -n 1)"
           test -n "$APKSIGNER"
+          test -n "$AAPT"
+
+          # Confirm the new APK is correctly signed and is the intended update.
           "$APKSIGNER" verify --verbose "$APK"
+          BADGING="$("$AAPT" dump badging "$APK" | head -n 1)"
+          echo "$BADGING" | grep -F "package: name='com.study.focus' versionCode='3' versionName='1.0.2'"
+
+          # Compare the new signer with the original public v1.0.0 release.
+          OLD_APK="$RUNNER_TEMP/studyfocus-v1.0.0.apk"
+          curl -fL --retry 3 --retry-delay 2 \
+            "https://github.com/CarbonSteel18/StudyFocus-Public/releases/download/v1.0.0/StudyFocus-v1.0.0.apk" \
+            -o "$OLD_APK"
+          "$APKSIGNER" verify --verbose "$OLD_APK"
+          OLD_CERT="$("$APKSIGNER" verify --print-certs "$OLD_APK" | sed -n 's/.*certificate SHA-256 digest: //p' | head -n 1 | tr '[:upper:]' '[:lower:]')"
+          NEW_CERT="$("$APKSIGNER" verify --print-certs "$APK" | sed -n 's/.*certificate SHA-256 digest: //p' | head -n 1 | tr '[:upper:]' '[:lower:]')"
+          test -n "$OLD_CERT"
+          test -n "$NEW_CERT"
+          if [ "$OLD_CERT" != "$NEW_CERT" ]; then
+            echo "::error::The new APK is not signed with the original v1.0.0 certificate. It cannot update existing installs."
+            exit 1
+          fi
+          echo "Original signing certificate continuity verified."
+
           mkdir -p release-assets
           cp "$APK" "release-assets/StudyFocus-${{ inputs.tag_name || github.ref_name }}.apk"
 
