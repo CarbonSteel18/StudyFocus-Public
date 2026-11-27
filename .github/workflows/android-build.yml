@@ -43,8 +43,10 @@ jobs:
 
   migration-tests:
     name: Run Room migration tests
-    # Use the stable Ubuntu 24.04 image for emulator/KVM compatibility.
+    # Force the Android emulator to use software TCG when KVM hardware acceleration is unavailable.
     runs-on: ubuntu-24.04
+    env:
+      ANDROID_I_WANT_MY_TCG: "yes"
     steps:
       - name: Check out source
         uses: actions/checkout@v4
