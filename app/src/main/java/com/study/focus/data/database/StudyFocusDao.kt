@@ -4,6 +4,7 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Transaction
 
 @Dao
 interface StudyFocusDao {
@@ -16,7 +17,7 @@ interface StudyFocusDao {
     @Query("DELETE FROM tasks")
     suspend fun clearTasks()
 
-    @androidx.room.Transaction
+    @Transaction
     suspend fun replaceTasks(tasks: List<TaskEntity>) {
         clearTasks()
         putTasks(tasks)
@@ -33,6 +34,18 @@ interface StudyFocusDao {
 
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertSessions(sessions: List<FocusSessionEntity>)
+
+    @Query("DELETE FROM focus_sessions")
+    suspend fun clearSessions()
+
+    @Transaction
+    suspend fun replaceAllData(tasks: List<TaskEntity>, sessions: List<FocusSessionEntity>) {
+        clearTasks()
+        putTasks(tasks)
+        clearSessions()
+        insertSessions(sessions)
+        pruneSessions()
+    }
 
     @Query("DELETE FROM focus_sessions WHERE id NOT IN (SELECT id FROM focus_sessions ORDER BY endedAtMillis DESC LIMIT 500)")
     suspend fun pruneSessions()
