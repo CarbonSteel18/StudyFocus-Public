@@ -24,6 +24,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.util.UUID
 import android.view.Gravity
@@ -122,6 +124,7 @@ class MainActivity : Activity() {
     private lateinit var repository: StudyFocusRepository
     private val activityScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private var roomReady = false
+    private val taskWriteMutex = Mutex()
     private var taskCache = mutableListOf<Task>()
     private var sessionCache = mutableListOf<Session>()
     private lateinit var page: LinearLayout
@@ -222,12 +225,17 @@ class MainActivity : Activity() {
                             contentResolver.openInputStream(uri)?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }
                                 ?: throw IllegalStateException("Could not read the selected file.")
                         }
-                        val report = withContext(Dispatchers.IO) { BackupManager.restoreBackup(json, StudyFocusDatabase.getInstance(applicationContext).studyFocusDao()) }
-                        val persisted = withContext(Dispatchers.IO) { repository.tasks() to repository.sessions() }
-                        taskCache = persisted.first.map { Task(it.id, it.title, it.subject, it.priority, it.dueAtMillis, it.isDone) }.toMutableList()
-                        sessionCache = persisted.second.map { Session(it.subject, it.durationSeconds, it.endedAtMillis, it.isAssignment) }.toMutableList()
-                        store.saveTasks(taskCache)
-                        store.saveSessions(sessionCache)
+                        val report = taskWriteMutex.withLock {
+                            val restored = withContext(Dispatchers.IO) {
+                                BackupManager.restoreBackup(json, StudyFocusDatabase.getInstance(applicationContext).studyFocusDao())
+                            }
+                            val persisted = withContext(Dispatchers.IO) { repository.tasks() to repository.sessions() }
+                            taskCache = persisted.first.map { Task(it.id, it.title, it.subject, it.priority, it.dueAtMillis, it.isDone) }.toMutableList()
+                            sessionCache = persisted.second.map { Session(it.subject, it.durationSeconds, it.endedAtMillis, it.isAssignment) }.toMutableList()
+                            store.saveTasks(taskCache)
+                            store.saveSessions(sessionCache)
+                            restored
+                        }
                         show()
                         Toast.makeText(this@MainActivity, "Restored ${report.taskCount} tasks and ${report.sessionCount} sessions.", Toast.LENGTH_LONG).show()
                     } catch (cancelled: CancellationException) { throw cancelled }
@@ -297,12 +305,15 @@ class MainActivity : Activity() {
     private fun sessionList(): MutableList<Session> = sessionCache.toMutableList()
 
     private fun saveTasks(tasks: List<Task>) {
-        taskCache = tasks.toMutableList()
-        store.saveTasks(tasks)
+        val snapshot = tasks.toList()
+        taskCache = snapshot.toMutableList()
+        store.saveTasks(snapshot)
         if (roomReady) activityScope.launch {
-            repository.saveTasks(tasks.map {
-                TaskEntity(it.id, it.title, it.subject, it.priority, it.due, it.done)
-            })
+            taskWriteMutex.withLock {
+                repository.saveTasks(snapshot.map {
+                    TaskEntity(it.id, it.title, it.subject, it.priority, it.due, it.done)
+                })
+            }
         }
     }
 
