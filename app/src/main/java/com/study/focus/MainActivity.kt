@@ -28,6 +28,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.util.UUID
+import java.io.ByteArrayOutputStream
 import android.view.Gravity
 import android.view.View
 import android.widget.*
@@ -223,8 +224,21 @@ class MainActivity : Activity() {
                 activityScope.launch {
                     try {
                         val json = withContext(Dispatchers.IO) {
-                            contentResolver.openInputStream(uri)?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }
-                                ?: throw IllegalStateException("Could not read the selected file.")
+                            contentResolver.openInputStream(uri)?.use { input ->
+                                val output = ByteArrayOutputStream()
+                                val buffer = ByteArray(8192)
+                                var totalBytes = 0
+                                while (true) {
+                                    val count = input.read(buffer)
+                                    if (count < 0) break
+                                    totalBytes += count
+                                    require(totalBytes <= 10 * 1024 * 1024) {
+                                        "The selected backup file is too large."
+                                    }
+                                    output.write(buffer, 0, count)
+                                }
+                                String(output.toByteArray(), Charsets.UTF_8)
+                            } ?: throw IllegalStateException("Could not read the selected file.")
                         }
                         val report = taskWriteMutex.withLock {
                             val restored = withContext(Dispatchers.IO) {
