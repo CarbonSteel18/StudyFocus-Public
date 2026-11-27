@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - phase-0-foundation
+      - phase-1-timer-backup
   pull_request:
     branches:
       - main
@@ -36,7 +37,7 @@ jobs:
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
-          name: StudyFocus-phase0-debug
+          name: StudyFocus-phase1-debug
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 14
