@@ -43,7 +43,8 @@ jobs:
 
   migration-tests:
     name: Run Room migration tests
-    runs-on: ubuntu-latest
+    # Use the stable Ubuntu 24.04 image for emulator/KVM compatibility.
+    runs-on: ubuntu-24.04
     steps:
       - name: Check out source
         uses: actions/checkout@v4
@@ -65,5 +66,7 @@ jobs:
           api-level: 34
           target: google_apis
           arch: x86_64
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
+          emulator-boot-timeout: 600
           disable-animations: true
           script: gradle --no-daemon connectedDebugAndroidTest
