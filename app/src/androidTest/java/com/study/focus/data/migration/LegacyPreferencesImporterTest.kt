@@ -4,6 +4,8 @@ import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.study.focus.data.backup.BackupManager
+import com.study.focus.data.database.FocusSessionEntity
 import com.study.focus.data.database.StudyFocusDatabase
 import com.study.focus.data.database.TaskEntity
 import com.study.focus.data.repository.StudyFocusRepository
@@ -117,5 +119,49 @@ class LegacyPreferencesImporterTest {
 
         assertEquals(1, report.importedTasks)
         assertTrue(database.studyFocusDao().getTasks().single().isDone)
+    }
+
+    @Test
+    fun backupRoundTripRestoresTasksAndFocusSessions() = runBlocking {
+        val tasks = listOf(TaskEntity(11, "Revise NLM", "Physics", 1, 9876L, false))
+        val sessions = listOf(FocusSessionEntity("session-1", "Mathematics", 1500, 12345L, false))
+        database.studyFocusDao().replaceAllData(tasks, sessions)
+
+        val json = BackupManager.createBackup(
+            database.studyFocusDao().getTasks(),
+            database.studyFocusDao().getSessions(),
+            createdAtMillis = 999L
+        )
+        database.studyFocusDao().replaceAllData(
+            listOf(TaskEntity(22, "Temporary", "General", 2, 0L, false)),
+            emptyList()
+        )
+
+        val report = BackupManager.restoreBackup(json, database.studyFocusDao())
+
+        assertEquals(1, report.taskCount)
+        assertEquals(1, report.sessionCount)
+        assertEquals("Revise NLM", database.studyFocusDao().getTasks().single().title)
+        assertEquals("session-1", database.studyFocusDao().getSessions().single().id)
+    }
+
+    @Test
+    fun invalidBackupDoesNotModifyExistingDatabaseData() = runBlocking {
+        database.studyFocusDao().replaceAllData(
+            listOf(TaskEntity(31, "Keep this task", "Chemistry", 2, 0L, true)),
+            listOf(FocusSessionEntity("keep-session", "Chemistry", 900, 456L, false))
+        )
+        val invalid = """{"format":"studyfocus-backup","version":1,"tasks":[{"id":1,"title":"Bad","priority":9}],"sessions":[]}"""
+
+        var rejected = false
+        try {
+            BackupManager.restoreBackup(invalid, database.studyFocusDao())
+        } catch (_: IllegalArgumentException) {
+            rejected = true
+        }
+
+        assertTrue(rejected)
+        assertEquals("Keep this task", database.studyFocusDao().getTasks().single().title)
+        assertEquals("keep-session", database.studyFocusDao().getSessions().single().id)
     }
 }
