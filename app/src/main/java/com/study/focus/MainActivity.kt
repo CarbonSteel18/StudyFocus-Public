@@ -494,6 +494,13 @@ class MainActivity : Activity() {
             gap(nextCard, 7)
         }
         nextCard.addView(btn("View all tasks", false) { tab = "Tasks"; show() })
+
+        val versionName = packageManager.getPackageInfo(packageName, 0).versionName ?: "unknown"
+        page.addView(txt("v$versionName", 10f, MUTED).apply {
+            gravity = Gravity.END
+            alpha = 0.65f
+            setPadding(0, dp(4), dp(2), dp(8))
+        }, LinearLayout.LayoutParams(-1, -2))
     }
     private fun tasks() {
         val name = field("What do you need to study?")
