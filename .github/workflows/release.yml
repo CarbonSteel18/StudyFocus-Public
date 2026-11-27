@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       tag_name:
-        description: "Release tag to publish (for example, v1.0.1)"
+        description: "Release tag to publish (for example, v1.0.3)"
         required: true
         type: string
 
@@ -75,7 +75,7 @@ jobs:
           # Confirm the new APK is correctly signed and is the intended update.
           "$APKSIGNER" verify --verbose "$APK"
           BADGING="$("$AAPT" dump badging "$APK" | head -n 1)"
-          echo "$BADGING" | grep -F "package: name='com.study.focus' versionCode='3' versionName='1.0.2'"
+          echo "$BADGING" | grep -F "package: name='com.study.focus' versionCode='4' versionName='1.0.3'"
 
           # Compare the new signer with the original public v1.0.0 release.
           OLD_APK="$RUNNER_TEMP/studyfocus-v1.0.0.apk"
