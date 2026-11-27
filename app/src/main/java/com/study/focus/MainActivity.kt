@@ -127,6 +127,7 @@ class MainActivity : Activity() {
     private val taskWriteMutex = Mutex()
     private var taskCache = mutableListOf<Task>()
     private var sessionCache = mutableListOf<Session>()
+    private val pendingSessions = mutableListOf<Session>()
     private lateinit var page: LinearLayout
     private var tab = "Home"
     private var due = 0L
@@ -280,6 +281,26 @@ class MainActivity : Activity() {
                 sessionCache = persisted.second.map {
                     Session(it.subject, it.durationSeconds, it.endedAtMillis, it.isAssignment)
                 }.toMutableList()
+                // If migration had already completed, sessions recorded before Room became
+                // ready exist only in the legacy cache. Persist them instead of losing them
+                // when the database snapshot replaces the in-memory cache.
+                if (imported.alreadyCompleted && pendingSessions.isNotEmpty()) {
+                    val queued = pendingSessions.toList()
+                    withContext(Dispatchers.IO) {
+                        queued.forEach { session ->
+                            repository.addSession(FocusSessionEntity(
+                                id = UUID.randomUUID().toString(),
+                                subject = session.subject,
+                                durationSeconds = session.seconds,
+                                endedAtMillis = session.ended,
+                                isAssignment = session.assignment
+                            ))
+                        }
+                    }
+                    sessionCache.addAll(queued)
+                    store.saveSessions(sessionCache)
+                }
+                pendingSessions.clear()
                 roomReady = true
                 show()
                 if (imported.recoveredPayloads.isNotEmpty()) {
@@ -321,6 +342,7 @@ class MainActivity : Activity() {
         sessionCache.add(session)
         while (sessionCache.size > 500) sessionCache.removeAt(0)
         store.addSession(session)
+        if (!roomReady) pendingSessions.add(session)
         if (roomReady) activityScope.launch {
             repository.addSession(FocusSessionEntity(
                 id = UUID.randomUUID().toString(),
