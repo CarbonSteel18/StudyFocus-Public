@@ -12,6 +12,7 @@ import android.os.CountDownTimer
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
+import com.study.focus.data.backup.BackupManager
 import com.study.focus.data.database.FocusSessionEntity
 import com.study.focus.data.database.StudyFocusDatabase
 import com.study.focus.data.database.TaskEntity
@@ -105,8 +106,11 @@ private class Store(a: Activity) {
     }
     fun addSession(s: Session) {
         val all = sessions(); all.add(s)
+        saveSessions(all)
+    }
+    fun saveSessions(list: List<Session>) {
         val a = JSONArray()
-        all.takeLast(500).forEach { x -> a.put(JSONObject().apply {
+        list.takeLast(500).forEach { x -> a.put(JSONObject().apply {
             put("subject", x.subject); put("seconds", x.seconds); put("ended", x.ended); put("assignment", x.assignment)
         }) }
         p.edit().putString("sessions", a.toString()).apply()
@@ -127,6 +131,8 @@ class MainActivity : Activity() {
     private var duration = 25
     private var left = 25L * 60000L
     private var running = false
+    private var timerEndAtMillis = 0L
+    private val timerPrefs by lazy { getSharedPreferences("study_focus_timer", MODE_PRIVATE) }
     private var timer: CountDownTimer? = null
     private val flipDigitViews = mutableListOf<TextView>()
     private var lastFlipDigits = ""
@@ -151,10 +157,87 @@ class MainActivity : Activity() {
         store = Store(this)
         taskCache = store.tasks()
         sessionCache = store.sessions()
+        restoreTimerState()
         window.statusBarColor = BG; window.navigationBarColor = BG
         flipHandler.post(flipTicker)
         initializeRoom()
     }
+    @Deprecated("Deprecated in Android API; retained for Activity-based document picker compatibility")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (resultCode != RESULT_OK || data?.data == null) return
+        val uri = data.data!!
+        when (requestCode) {
+            9101 -> exportBackupTo(uri)
+            9102 -> importBackupFrom(uri)
+        }
+    }
+
+    private fun launchBackupExport() {
+        if (!roomReady) { Toast.makeText(this, "Database is still loading. Try again shortly.", Toast.LENGTH_SHORT).show(); return }
+        val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE)
+            type = "application/json"
+            putExtra(Intent.EXTRA_TITLE, "StudyFocus-Backup.json")
+        }
+        startActivityForResult(intent, 9101)
+    }
+
+    private fun launchBackupImport() {
+        if (!roomReady) { Toast.makeText(this, "Database is still loading. Try again shortly.", Toast.LENGTH_SHORT).show(); return }
+        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE)
+            type = "application/json"
+        }
+        startActivityForResult(intent, 9102)
+    }
+
+    private fun exportBackupTo(uri: android.net.Uri) {
+        activityScope.launch {
+            try {
+                val json = withContext(Dispatchers.IO) {
+                    BackupManager.createBackup(repository.tasks(), repository.sessions())
+                }
+                withContext(Dispatchers.IO) {
+                    contentResolver.openOutputStream(uri)?.bufferedWriter(Charsets.UTF_8)?.use { it.write(json) }
+                        ?: throw IllegalStateException("Could not open the selected destination.")
+                }
+                Toast.makeText(this@MainActivity, "Backup exported successfully.", Toast.LENGTH_LONG).show()
+            } catch (cancelled: CancellationException) { throw cancelled }
+            catch (error: Exception) {
+                Toast.makeText(this@MainActivity, "Backup failed: ${error.message ?: "unknown error"}", Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
+    private fun importBackupFrom(uri: android.net.Uri) {
+        AlertDialog.Builder(this)
+            .setTitle("Replace app data?")
+            .setMessage("Restoring a backup replaces your current tasks and focus history. Export a backup first if you want to keep the current data.")
+            .setNegativeButton("Cancel", null)
+            .setPositiveButton("Restore") { _, _ ->
+                activityScope.launch {
+                    try {
+                        val json = withContext(Dispatchers.IO) {
+                            contentResolver.openInputStream(uri)?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }
+                                ?: throw IllegalStateException("Could not read the selected file.")
+                        }
+                        val report = withContext(Dispatchers.IO) { BackupManager.restoreBackup(json, StudyFocusDatabase.getInstance(applicationContext).studyFocusDao()) }
+                        val persisted = withContext(Dispatchers.IO) { repository.tasks() to repository.sessions() }
+                        taskCache = persisted.first.map { Task(it.id, it.title, it.subject, it.priority, it.dueAtMillis, it.isDone) }.toMutableList()
+                        sessionCache = persisted.second.map { Session(it.subject, it.durationSeconds, it.endedAtMillis, it.isAssignment) }.toMutableList()
+                        store.saveTasks(taskCache)
+                        store.saveSessions(sessionCache)
+                        show()
+                        Toast.makeText(this@MainActivity, "Restored ${report.taskCount} tasks and ${report.sessionCount} sessions.", Toast.LENGTH_LONG).show()
+                    } catch (cancelled: CancellationException) { throw cancelled }
+                    catch (error: Exception) {
+                        Toast.makeText(this@MainActivity, "Restore failed: ${error.message ?: "invalid backup"}", Toast.LENGTH_LONG).show()
+                    }
+                }
+            }.show()
+    }
+
     override fun onBackPressed() {
         if (tab == "Flip") {
             tab = "Home"
@@ -442,20 +525,75 @@ class MainActivity : Activity() {
         note.addView(txt("MAKE IT COUNT", 10f, ACCENT, true)); gap(note, 6)
         note.addView(txt("Silence notifications, choose one goal, and take a short break when the session ends. Completed sessions appear in your study stats.", 13f, MUTED))
     }
+    private fun persistTimerState() {
+        timerPrefs.edit()
+            .putInt("duration_minutes", duration)
+            .putString("subject", subject)
+            .putLong("remaining_millis", left.coerceAtLeast(0L))
+            .putBoolean("running", running)
+            .putLong("end_at_millis", if (running) timerEndAtMillis else 0L)
+            .apply()
+    }
+
+    private fun restoreTimerState() {
+        if (!timerPrefs.contains("duration_minutes")) return
+        duration = timerPrefs.getInt("duration_minutes", 25).coerceIn(1, 180)
+        subject = timerPrefs.getString("subject", "General") ?: "General"
+        left = timerPrefs.getLong("remaining_millis", duration * 60000L).coerceAtLeast(0L)
+        val wasRunning = timerPrefs.getBoolean("running", false)
+        timerEndAtMillis = timerPrefs.getLong("end_at_millis", 0L)
+        if (wasRunning) {
+            left = (timerEndAtMillis - System.currentTimeMillis()).coerceAtLeast(0L)
+            if (left == 0L) {
+                running = false
+                timerPrefs.edit().putBoolean("running", false).putLong("remaining_millis", 0L).apply()
+                addSession(Session(subject, duration * 60, timerEndAtMillis, false))
+            } else {
+                start()
+            }
+        } else {
+            running = false
+        }
+    }
+
     private fun start() {
         if (left <= 0L) left = duration * 60000L
         running = true
+        timerEndAtMillis = System.currentTimeMillis() + left
+        persistTimerState()
         timer = object : CountDownTimer(left, 1000L) {
             override fun onTick(ms: Long) { left = ms; if (tab == "Focus") show() }
             override fun onFinish() {
-                left = 0L; running = false; addSession(Session(subject, duration * 60, System.currentTimeMillis(), false))
-                Toast.makeText(this@MainActivity, "Focus session complete!", Toast.LENGTH_LONG).show(); show()
+                left = 0L
+                running = false
+                timerEndAtMillis = 0L
+                persistTimerState()
+                addSession(Session(subject, duration * 60, System.currentTimeMillis(), false))
+                Toast.makeText(this@MainActivity, "Focus session complete!", Toast.LENGTH_LONG).show()
+                show()
             }
         }.start()
         show()
     }
-    private fun pause() { timer?.cancel(); running = false; show() }
-    private fun reset() { timer?.cancel(); running = false; left = duration * 60000L; show() }
+
+    private fun pause() {
+        left = if (running && timerEndAtMillis > 0L)
+            (timerEndAtMillis - System.currentTimeMillis()).coerceAtLeast(0L) else left
+        timer?.cancel()
+        running = false
+        timerEndAtMillis = 0L
+        persistTimerState()
+        show()
+    }
+
+    private fun reset() {
+        timer?.cancel()
+        running = false
+        timerEndAtMillis = 0L
+        left = duration * 60000L
+        persistTimerState()
+        show()
+    }
     private fun time(ms: Long) = String.format(Locale.getDefault(), "%02d:%02d", ms / 60000L, (ms / 1000L) % 60L)
     private fun formatElapsed(ms: Long): String {
         val totalSeconds = ms / 1000L
@@ -655,6 +793,12 @@ class MainActivity : Activity() {
             recent.addView(txt(s.subject + " · " + formatElapsed(s.seconds * 1000L) + if (s.assignment) " · Assignment" else "", 13f, FG, true))
             recent.addView(txt(dtf.format(Date(s.ended)), 10f, MUTED)); gap(recent, 8)
         }
+        val backup = card(page)
+        backup.addView(txt("DATA BACKUP", 10f, ACCENT, true)); gap(backup, 7)
+        backup.addView(txt("Export your tasks and focus history to a JSON file, or restore them later. Files stay under your control.", 12f, MUTED)); gap(backup, 9)
+        backup.addView(btn("Export backup", true) { launchBackupExport() })
+        gap(backup, 6)
+        backup.addView(btn("Restore from backup", false) { launchBackupImport() })
     }
     private fun launchApp(packageName: String, label: String) {
         val intent = packageManager.getLaunchIntentForPackage(packageName)
